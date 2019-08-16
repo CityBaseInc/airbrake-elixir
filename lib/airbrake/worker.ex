@@ -30,7 +30,8 @@ defmodule Airbrake.Worker do
     {:error, ArgumentError}
   end
 
-  @spec remember(Exception.t() | [type: String.t(), message: String.t()], Keyword.t()) :: :ok
+  @spec remember(Exception.t() | [type: String.t(), message: String.t()] | term(), Keyword.t()) ::
+          :ok
   def remember(exception, options \\ [])
 
   def remember(%{__exception__: true} = exception, options) when is_list(options) do
@@ -39,6 +40,11 @@ defmodule Airbrake.Worker do
 
   def remember([type: _, message: _] = exception, options) when is_list(options) do
     GenServer.cast(@name, {:remember, exception, options})
+  end
+
+  def remember(error_term, options) do
+    # NOTE: this does not filter any fields in `error_term`!
+    remember([type: "error term", message: inspect(error_term)], options)
   end
 
   @spec monitor(pid | {reg_name :: atom, node :: atom} | reg_name :: atom) :: :ok
