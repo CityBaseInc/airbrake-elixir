@@ -26,6 +26,7 @@ defmodule Airbrake.Worker do
     GenServer.cast(@name, {:report, exception, stacktrace, Keyword.delete(options, :stacktrace)})
   end
 
+  # NOTE: I think the same sort of thing needs to be done here
   def report(_, _) do
     {:error, ArgumentError}
   end
