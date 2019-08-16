@@ -30,7 +30,7 @@ defmodule Airbrake.Worker do
     {:error, ArgumentError}
   end
 
-  @spec report(Exception.t() | [type: String.t(), message: String.t()], Keyword.t()) :: :ok
+  @spec remember(Exception.t() | [type: String.t(), message: String.t()], Keyword.t()) :: :ok
   def remember(exception, options \\ [])
 
   def remember(%{__exception__: true} = exception, options) when is_list(options) do
