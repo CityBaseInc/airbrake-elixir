@@ -11,29 +11,32 @@ defmodule Airbrake.Worker do
   @request_headers [{"Content-Type", "application/json"}]
   @default_host "https://airbrake.io"
 
-
   @doc """
   Send a report to Airbrake.
   """
-  @spec report(Exception.t | [type: String.t, message: String.t], Keyword.t) :: :ok
+  @spec report(Exception.t() | [type: String.t(), message: String.t()], Keyword.t()) :: :ok
   def report(exception, options \\ [])
+
   def report(%{__exception__: true} = exception, options) when is_list(options) do
     report(exception_info(exception), options)
   end
+
   def report([type: _, message: _] = exception, options) when is_list(options) do
-    stacktrace = options[:stacktrace] || System.stacktrace
+    stacktrace = options[:stacktrace] || System.stacktrace()
     GenServer.cast(@name, {:report, exception, stacktrace, Keyword.delete(options, :stacktrace)})
   end
+
   def report(_, _) do
     {:error, ArgumentError}
   end
 
-
-  @spec report(Exception.t | [type: String.t, message: String.t], Keyword.t) :: :ok
+  @spec report(Exception.t() | [type: String.t(), message: String.t()], Keyword.t()) :: :ok
   def remember(exception, options \\ [])
+
   def remember(%{__exception__: true} = exception, options) when is_list(options) do
     remember(exception_info(exception), options)
   end
+
   def remember([type: _, message: _] = exception, options) when is_list(options) do
     GenServer.cast(@name, {:remember, exception, options})
   end
@@ -44,20 +47,26 @@ defmodule Airbrake.Worker do
   end
 
   def start_link do
-    GenServer.start_link(@name, %State{}, [name: @name])
+    GenServer.start_link(@name, %State{}, name: @name)
   end
 
   def exception_info(exception) do
     [type: inspect(exception.__struct__), message: Exception.message(exception)]
   end
 
-  def handle_cast({:report, exception, stacktrace, options}, %{last_exception: {exception, details}} = state) do
-    enhanced_options = Enum.reduce([:context, :params, :session, :env], options, fn(key, enhanced_options) ->
-      Keyword.put(enhanced_options, key, Map.merge(options[key] || %{}, details[key] || %{}))
-    end)    
+  def handle_cast(
+        {:report, exception, stacktrace, options},
+        %{last_exception: {exception, details}} = state
+      ) do
+    enhanced_options =
+      Enum.reduce([:context, :params, :session, :env], options, fn key, enhanced_options ->
+        Keyword.put(enhanced_options, key, Map.merge(options[key] || %{}, details[key] || %{}))
+      end)
+
     send_report(exception, stacktrace, enhanced_options)
     {:noreply, Map.put(state, :last_exception, nil)}
   end
+
   def handle_cast({:report, exception, stacktrace, options}, state) do
     send_report(exception, stacktrace, options)
     {:noreply, state}
@@ -87,20 +96,22 @@ defmodule Airbrake.Worker do
     end
   end
 
-  defp ignore?([type: type, message: message]) do
+  defp ignore?(type: type, message: message) do
     ignore?(get_env(:ignore), type, message)
   end
+
   defp ignore?(nil, _type, _message), do: false
   defp ignore?(:all, _type, _message), do: true
   defp ignore?(%MapSet{} = types, type, _message), do: MapSet.member?(types, type)
   defp ignore?(fun, type, message) when is_function(fun), do: fun.(type, message)
 
-
   defp process_name(pid, pid), do: "Process [#{inspect(pid)}]"
   defp process_name(pname, pid), do: "#{inspect(pname)} [#{inspect(pid)}]"
 
   defp notify_url do
-    "#{get_env(:host, @default_host)}/api/v3/projects/#{get_env(:project_id)}/notices?key=#{get_env(:api_key)}"
+    "#{get_env(:host, @default_host)}/api/v3/projects/#{get_env(:project_id)}/notices?key=#{
+      get_env(:api_key)
+    }"
   end
 
   def get_env(key, default \\ nil) do
